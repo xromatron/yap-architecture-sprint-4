@@ -1,0 +1,41 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+autonumber
+
+actor "Operator" as operator  order 2
+actor "API user" as extapi order 1
+queue "Rabbit MQ" as q order 6
+participant "MES API" as mesapi order 3
+participant Кэш as cache order 4
+database "База данных" as db order 5
+
+group Поступление заказа
+alt из очереди сообщений (клиент нашего сайта)
+q ->> mesapi: данные заказа
+else от других продавцов
+extapi -> mesapi: данные заказа
+end alt
+mesapi -> db: сохранение данных заказа
+mesapi -> cache: инвалидация кэша новых заказов
+end group
+
+group Калькуляция заказа
+mesapi -> mesapi: калькуляция стоимости производства
+mesapi -> db: обновление данных по стоимости
+mesapi -> cache: инвалидация кэша рассчитанных заказов
+end group
+
+loop Взять заказ в работу
+operator -> mesapi: запрос списка заказов
+mesapi -> cache: Получение списка посчитанных заказов из кеша
+mesapi <-- cache: Возврат списка посчитанных заказов из кеша
+opt Данные отсутствуют в кеше
+mesapi -> db: Получение списка посчитанных заказов из БД
+mesapi <-- db: Возврат списка посчитанных заказов из кеша
+mesapi -> cache: Сохранение списка посчитанных заказов в кеш
+end opt
+mesapi -> operator: список посчитанных заказов
+end loop
+
+@enduml
